@@ -8,6 +8,7 @@ module Exercises where
 
 import Data.Function ((&))
 import Data.Kind (Constraint, Type)
+import Prelude hiding (length)
 
 {- ONE -}
 
@@ -110,16 +111,20 @@ data List a = Nil | Cons a (List a)
 -- exercise. Bear in mind that, at the type-level, 'Nil' and 'Cons' should be
 -- "ticked". Remember also that, at the type-level, there's nothing weird about
 -- having a list of types!
-data HList (types :: List Type)
-
--- HNil  :: ...
--- HCons :: ...
+data HList (types :: List Type) where
+  HNil :: HList 'Nil
+  HCons :: x -> HList xs -> HList ('Cons x xs)
 
 -- | b. Write a well-typed, 'Maybe'-less implementation for the 'tail' function
 -- on 'HList'.
+tail :: HList ('Cons x xs) -> HList xs
+tail (HCons _ xs) = xs
 
 -- | c. Could we write the 'take' function? What would its type be? What would
 -- get in our way?
+-- We can't apply 'take' to the type-level?
+take :: Int -> HList xs -> HList xs
+take = error "I don't know how to do this..."
 
 {- SIX -}
 
@@ -135,17 +140,27 @@ data BlogAction
 -- express, at the type-level, whether the value is an admin-only operation.
 -- Remember that, by switching on @DataKinds@, we have access to a promoted
 -- version of 'Bool'!
+data BlogAction' (a :: Bool) where
+  AddBlog' :: BlogAction' 'False
+  DeleteBlog' :: BlogAction' 'True
+  AddComment' :: BlogAction' 'False
+  DeleteComment' :: BlogAction' 'True
 
 -- | b. Write a 'BlogAction' list type that requires all its members to be
 -- the same "access level": "admin" or "non-admin".
-
--- data BlogActionList (isSafe :: ???) where
---   ...
+newtype BlogActionList (isSafe :: Bool) = BlogActionList [BlogAction' isSafe]
 
 -- | c. Let's imagine that our requirements change, and 'DeleteComment' is now
 -- available to a third role: moderators. Could we use 'DataKinds' to introduce
 -- the three roles at the type-level, and modify our type to keep track of
 -- this?
+data Role = User | Moderator | Admin
+
+data BlogAction'' (who :: [Role]) where
+  AddBlog'' :: BlogAction'' '[User, Moderator, Admin]
+  DeleteBlog'' :: BlogAction'' '[Admin]
+  AddComment'' :: BlogAction'' '[User, Moderator, Admin]
+  DeleteComment'' :: BlogAction'' '[Moderator, Admin]
 
 {- SEVEN -}
 
@@ -162,16 +177,17 @@ data SBool (value :: Bool) where
   STrue :: SBool 'True
 
 -- | a. Write a singleton type for natural numbers:
-data SNat (value :: Nat)
-
--- ...
+data SNat (value :: Nat) where
+  SZero :: SNat 'Z
+  SSNat :: SNat n -> SNat ('S n)
 
 -- | b. Write a function that extracts a vector's length at the type level:
 length :: Vector n a -> SNat n
-length = error "Implement me!"
+length VNil = SZero
+length (VCons _ v) = SSNat (length v)
 
 -- | c. Is 'Proxy' a singleton type?
-data Proxy a = Proxy
+data Proxy a = Proxy -- No, you have as many possible values as types of @a@!
 
 {- EIGHT -}
 
