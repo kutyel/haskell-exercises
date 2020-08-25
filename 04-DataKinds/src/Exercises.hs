@@ -7,8 +7,9 @@
 module Exercises where
 
 import Data.Function ((&))
+import Data.Functor (($>))
 import Data.Kind (Constraint, Type)
-import Prelude hiding (length)
+import Prelude hiding ((!!), length)
 
 {- ONE -}
 
@@ -232,11 +233,32 @@ myApp =
 -- sure the constructors respect this flag: we shouldn't be able to read or
 -- write to the file unless it's open. This exercise is a bit brain-bending;
 -- why? How could we make it more intuitive to write?
+data Program' (isFileOpen :: Bool) result where
+  OpenFile' :: Program' 'True result -> Program' 'False result
+  WriteFile' :: String -> Program' 'True result -> Program' 'True result
+  ReadFile' :: (String -> Program' 'True result) -> Program' 'True result
+  CloseFile' :: Program' 'False result -> Program' 'True result
+  Exit' :: result -> Program' 'False result
+
+myApp' :: Program' 'False Bool
+myApp' =
+  OpenFile' $
+    WriteFile'
+      "HEY"
+      ( ReadFile' $ \contents ->
+          if contents == "WHAT"
+            then WriteFile' "... bug?" $ CloseFile' $ Exit' False
+            else CloseFile' $ Exit' True
+      )
 
 -- | EXTRA: write an interpreter for this program. Nothing to do with data
 -- kinds, but a nice little problem.
-interpret :: Program {- ??? -} a -> IO a
-interpret = error "Implement me?"
+interpret :: Program' any a -> IO a
+interpret (OpenFile' next) = putStrLn "Open file..." *> interpret next
+interpret (WriteFile' output next) = putStrLn ("Writing " ++ output ++ "...") *> interpret next
+interpret (ReadFile' f) = interpret (f "Some file contents")
+interpret (CloseFile' next) = putStrLn "Closing file..." *> interpret next
+interpret (Exit' x) = putStrLn "Goodbye!" $> x
 
 {- NINE -}
 
@@ -251,12 +273,17 @@ data Vector (n :: Nat) (a :: Type) where
 
 -- | a. Implement this type! This might seem scary at first, but break it down
 -- into Z and S cases. That's all the hint you need :)
-data SmallerThan (limit :: Nat)
-
--- ...
+data SmallerThan (limit :: Nat) where
+  -- Z is the smallest
+  SmallerThanZ :: SmallerThan ('S any)
+  SmallerThanS :: SmallerThan any -> SmallerThan ('S any)
 
 -- | b. Write the '(!!)' function:
 (!!) :: Vector n a -> SmallerThan n -> a
-(!!) = error "Implement me!"
+(VCons x _) !! SmallerThanZ = x
+(VCons _ xs) !! SmallerThanS n = xs !! n
 
 -- | c. Write a function that converts a @SmallerThan n@ into a 'Nat'.
+toNat :: SmallerThan n -> Nat
+toNat SmallerThanZ = Z
+toNat (SmallerThanS x) = S (toNat x)
